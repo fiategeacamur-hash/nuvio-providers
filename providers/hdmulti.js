@@ -1,6 +1,6 @@
 /**
  * hdmulti - Built from src/hdmulti/
- * Generated: 2026-04-16T19:09:00.943Z
+ * Generated: 2026-04-16T19:22:44.400Z
  */
 var __defProp = Object.defineProperty;
 var __defProps = Object.defineProperties;
@@ -2998,16 +2998,14 @@ function getStreams(tmdbId, mediaType = "movie", season = null, episode = null) 
       return [];
     }
     const normalizedType = normalizeMediaType(mediaType);
-    const settled = yield Promise.allSettled(
+    const results = yield Promise.all(
       SOURCES.map((source) => runSource(source, tmdbId, normalizedType, season, episode))
     );
-    const streams = [];
-    for (const item of settled) {
-      if (item.status === "fulfilled" && Array.isArray(item.value)) {
-        streams.push(...item.value);
-      }
-    }
-    return streams;
+    return results.reduce((streams, sourceStreams) => {
+      if (Array.isArray(sourceStreams))
+        streams.push(...sourceStreams);
+      return streams;
+    }, []);
   });
 }
 module.exports = { getStreams };

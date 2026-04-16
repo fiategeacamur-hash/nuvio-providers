@@ -69,18 +69,14 @@ async function getStreams(tmdbId, mediaType = 'movie', season = null, episode = 
 
   const normalizedType = normalizeMediaType(mediaType);
 
-  const settled = await Promise.allSettled(
+  const results = await Promise.all(
     SOURCES.map((source) => runSource(source, tmdbId, normalizedType, season, episode))
   );
 
-  const streams = [];
-  for (const item of settled) {
-    if (item.status === 'fulfilled' && Array.isArray(item.value)) {
-      streams.push(...item.value);
-    }
-  }
-
-  return streams;
+  return results.reduce((streams, sourceStreams) => {
+    if (Array.isArray(sourceStreams)) streams.push(...sourceStreams);
+    return streams;
+  }, []);
 }
 
 module.exports = { getStreams };
