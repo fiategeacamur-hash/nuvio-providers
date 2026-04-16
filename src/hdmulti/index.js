@@ -10,6 +10,12 @@ const SOURCES = [
   { key: 'moviesdrive', label: 'Moviesdrive', provider: moviesdrive }
 ];
 
+function normalizeMediaType(mediaType) {
+  if (mediaType === 'series') return 'tv';
+  if (mediaType === 'show') return 'tv';
+  return mediaType || 'movie';
+}
+
 function withSiteLabel(stream, source) {
   const cloned = Object.assign({}, stream);
   const safeName = (cloned.name || '').trim();
@@ -35,8 +41,10 @@ async function runSource(source, tmdbId, mediaType, season, episode) {
 }
 
 async function getStreams(tmdbId, mediaType = 'movie', season = null, episode = null) {
+  const normalizedType = normalizeMediaType(mediaType);
+
   const settled = await Promise.allSettled(
-    SOURCES.map((source) => runSource(source, tmdbId, mediaType, season, episode))
+    SOURCES.map((source) => runSource(source, tmdbId, normalizedType, season, episode))
   );
 
   const streams = [];
