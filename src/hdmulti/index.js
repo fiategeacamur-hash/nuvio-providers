@@ -18,6 +18,7 @@ const SOURCES = [
   { key: 'hdhub4u', label: 'HDHub4u', provider: loadProvider('HDHub4u', () => require('../../providers/hdhub4u.js')) },
   { key: 'moviesdrive', label: 'Moviesdrive', provider: loadProvider('Moviesdrive', () => require('../../providers/moviesdrive.js')) }
 ].filter((source) => Boolean(source.provider));
+const SOURCE_TIMEOUT_MS = 8_000;
 
 function normalizeMediaType(mediaType) {
   if (mediaType === 'series') return 'tv';
@@ -39,13 +40,24 @@ function withSiteLabel(stream, source) {
 }
 
 async function runSource(source, tmdbId, mediaType, season, episode) {
+  let timeoutId;
   try {
-    const result = await source.provider.getStreams(tmdbId, mediaType, season, episode);
+    const result = await Promise.race([
+      source.provider.getStreams(tmdbId, mediaType, season, episode),
+      new Promise((resolve) => {
+        timeoutId = setTimeout(() => {
+          console.log(`[HDMulti] ${source.label} timed out after ${SOURCE_TIMEOUT_MS}ms.`);
+          resolve([]);
+        }, SOURCE_TIMEOUT_MS);
+      })
+    ]);
     if (!Array.isArray(result)) return [];
     return result.map((stream) => withSiteLabel(stream, source));
   } catch (error) {
     console.log(`[HDMulti] ${source.label} failed: ${error && error.message ? error.message : error}`);
     return [];
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
 

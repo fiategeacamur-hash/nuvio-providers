@@ -1,6 +1,6 @@
 /**
  * hdmulti - Built from src/hdmulti/
- * Generated: 2026-04-16T18:54:22.588Z
+ * Generated: 2026-04-16T19:09:00.943Z
  */
 var __defProp = Object.defineProperty;
 var __defProps = Object.defineProperties;
@@ -2948,6 +2948,7 @@ var SOURCES = [
   { key: "hdhub4u", label: "HDHub4u", provider: loadProvider("HDHub4u", () => require_hdhub4u()) },
   { key: "moviesdrive", label: "Moviesdrive", provider: loadProvider("Moviesdrive", () => require_moviesdrive()) }
 ].filter((source) => Boolean(source.provider));
+var SOURCE_TIMEOUT_MS = 8e3;
 function normalizeMediaType(mediaType) {
   if (mediaType === "series")
     return "tv";
@@ -2967,14 +2968,26 @@ function withSiteLabel(stream, source) {
 }
 function runSource(source, tmdbId, mediaType, season, episode) {
   return __async(this, null, function* () {
+    let timeoutId;
     try {
-      const result = yield source.provider.getStreams(tmdbId, mediaType, season, episode);
+      const result = yield Promise.race([
+        source.provider.getStreams(tmdbId, mediaType, season, episode),
+        new Promise((resolve) => {
+          timeoutId = setTimeout(() => {
+            console.log(`[HDMulti] ${source.label} timed out after ${SOURCE_TIMEOUT_MS}ms.`);
+            resolve([]);
+          }, SOURCE_TIMEOUT_MS);
+        })
+      ]);
       if (!Array.isArray(result))
         return [];
       return result.map((stream) => withSiteLabel(stream, source));
     } catch (error) {
       console.log(`[HDMulti] ${source.label} failed: ${error && error.message ? error.message : error}`);
       return [];
+    } finally {
+      if (timeoutId)
+        clearTimeout(timeoutId);
     }
   });
 }
