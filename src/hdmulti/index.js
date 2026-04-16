@@ -24,9 +24,24 @@ const SOURCE_TIMEOUT_BY_KEY = {
   hdhub4u: 12_000,
   '4khdhub': 12_000
 };
+const TV_SOURCE_ALLOWLIST = ['4khdhub', 'uhdmovies'];
 
 function getSourceTimeout(source) {
   return SOURCE_TIMEOUT_BY_KEY[source.key] || 15_000;
+}
+
+function isTvRuntime() {
+  try {
+    const ua = String(globalThis && globalThis.navigator && globalThis.navigator.userAgent ? globalThis.navigator.userAgent : '').toLowerCase();
+    return /smart-tv|smarttv|tizen|web0s|webos|bravia|aft|android tv|googletv/.test(ua);
+  } catch (_) {
+    return false;
+  }
+}
+
+function getActiveSources() {
+  if (!isTvRuntime()) return SOURCES;
+  return SOURCES.filter((source) => TV_SOURCE_ALLOWLIST.includes(source.key));
 }
 
 function normalizeMediaType(mediaType) {
@@ -72,21 +87,32 @@ async function runSource(source, tmdbId, mediaType, season, episode) {
 }
 
 async function getStreams(tmdbId, mediaType = 'movie', season = null, episode = null) {
-  if (SOURCES.length === 0) {
+  const activeSources = getActiveSources();
+
+  if (activeSources.length === 0) {
     console.log('[HDMulti] No sub-providers are available in this runtime.');
     return [];
   }
 
   const normalizedType = normalizeMediaType(mediaType);
+  const streams = [];
+  const runSequentially = isTvRuntime();
+
+  if (runSequentially) {
+    for (const source of activeSources) {
+      const result = await runSource(source, tmdbId, normalizedType, season, episode);
+      if (Array.isArray(result)) streams.push(...result);
+    }
+    return streams;
+  }
 
   const results = await Promise.all(
-    SOURCES.map((source) => runSource(source, tmdbId, normalizedType, season, episode))
+    activeSources.map((source) => runSource(source, tmdbId, normalizedType, season, episode))
   );
-
-  return results.reduce((streams, sourceStreams) => {
+  for (const sourceStreams of results) {
     if (Array.isArray(sourceStreams)) streams.push(...sourceStreams);
-    return streams;
-  }, []);
+  }
+  return streams;
 }
 
 module.exports = { getStreams };
