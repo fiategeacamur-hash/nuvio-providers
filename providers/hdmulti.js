@@ -1,6 +1,6 @@
 /**
  * hdmulti - Built from src/hdmulti/
- * Generated: 2026-04-16T18:45:40.431Z
+ * Generated: 2026-04-16T18:54:22.588Z
  */
 var __defProp = Object.defineProperty;
 var __defProps = Object.defineProperties;
@@ -51,7 +51,7 @@ var require_uhdmovies = __commonJS({
   "providers/uhdmovies.js"(exports2, module2) {
     "use strict";
     var cheerio = require("cheerio-without-node-native");
-    var DOMAIN = "https://uhdmovies.rip";
+    var DOMAIN = "https://uhdmovies.ink";
     var DOMAINS_URL = "https://raw.githubusercontent.com/phisher98/TVVVV/refs/heads/main/domains.json";
     var DOMAIN_CACHE = { url: DOMAIN, ts: 0 };
     function getLatestDomain() {
@@ -1896,7 +1896,7 @@ var require_moviesdrive = __commonJS({
     var cheerio = require("cheerio-without-node-native");
     var TMDB_API_KEY = "439c478a771f35c05022f9feabcca01c";
     var TMDB_BASE_URL = "https://api.themoviedb.org/3";
-    var MAIN_URL = "https://new1.moviesdrive.surf";
+    var MAIN_URL = "https://new2.moviesdrives.my";
     var DOMAINS_URL = "https://raw.githubusercontent.com/phisher98/TVVVV/refs/heads/main/domains.json";
     var DOMAIN_CACHE_TTL = 4 * 60 * 60 * 1e3;
     var domainCacheTimestamp = 0;
