@@ -1,14 +1,38 @@
-const uhdmovies = require('../../providers/uhdmovies.js');
-const fourkhdhub = require('../../providers/4khdhub.js');
-const hdhub4u = require('../../providers/hdhub4u.js');
-const moviesdrive = require('../../providers/moviesdrive.js');
+function safeRequire(paths, label) {
+  for (const path of paths) {
+    try {
+      return require(path);
+    } catch (error) {
+      // Try next path.
+    }
+  }
+
+  console.log(`[HDMulti] ${label} unavailable in this runtime.`);
+  return null;
+}
 
 const SOURCES = [
-  { key: 'uhdmovies', label: 'UHDMovies', provider: uhdmovies },
-  { key: '4khdhub', label: '4KHDHub', provider: fourkhdhub },
-  { key: 'hdhub4u', label: 'HDHub4u', provider: hdhub4u },
-  { key: 'moviesdrive', label: 'Moviesdrive', provider: moviesdrive }
-];
+  {
+    key: 'uhdmovies',
+    label: 'UHDMovies',
+    provider: safeRequire(['./uhdmovies.js', '../uhdmovies.js', '../../providers/uhdmovies.js'], 'UHDMovies')
+  },
+  {
+    key: '4khdhub',
+    label: '4KHDHub',
+    provider: safeRequire(['./4khdhub.js', '../4khdhub.js', '../../providers/4khdhub.js'], '4KHDHub')
+  },
+  {
+    key: 'hdhub4u',
+    label: 'HDHub4u',
+    provider: safeRequire(['./hdhub4u.js', '../hdhub4u.js', '../../providers/hdhub4u.js'], 'HDHub4u')
+  },
+  {
+    key: 'moviesdrive',
+    label: 'Moviesdrive',
+    provider: safeRequire(['./moviesdrive.js', '../moviesdrive.js', '../../providers/moviesdrive.js'], 'Moviesdrive')
+  }
+].filter((source) => source.provider && typeof source.provider.getStreams === 'function');
 
 function normalizeMediaType(mediaType) {
   if (mediaType === 'series') return 'tv';
@@ -41,6 +65,11 @@ async function runSource(source, tmdbId, mediaType, season, episode) {
 }
 
 async function getStreams(tmdbId, mediaType = 'movie', season = null, episode = null) {
+  if (SOURCES.length === 0) {
+    console.log('[HDMulti] No sub-providers are available in this runtime.');
+    return [];
+  }
+
   const normalizedType = normalizeMediaType(mediaType);
 
   const settled = await Promise.allSettled(
