@@ -3,23 +3,25 @@
   "version": "1.0.0",
   "scrapers": [
     {
-      "id": "4khdhub",
-      "name": "4KHDHub",
-      "description": "4KHDHub direct links",
-      "version": "1.0.2",
+      "id": "hdmulti",
+      "name": "HDMulti",
+      "description": "Combined provider for UHDMovies, 4KHDHub, HDHub4u and Moviesdrive. Each source is labeled per stream.",
+      "version": "1.0.0",
       "author": "Nuvio Team",
       "supportedTypes": [
         "movie",
         "tv"
       ],
-      "filename": "providers/4khdhub.js",
+      "filename": "providers/hdmulti.js",
       "enabled": true,
       "formats": [
-        "mkv"
+        "mkv",
+        "mp4"
       ],
-      "logo": "https://www.google.com/s2/favicons?domain=4khdhub.fans&sz=128",
+      "logo": "https://www.google.com/s2/favicons?domain=uhdmovies.rip&sz=128",
       "contentLanguage": [
-        "en"
+        "en",
+        "hin"
       ]
     },
     {
@@ -56,26 +58,6 @@
         "m3u8"
       ],
       "logo": "https://www.google.com/s2/favicons?domain=animepahe.ru&sz=128",
-      "contentLanguage": [
-        "en"
-      ]
-    },
-    {
-      "id": "uhdmovies",
-      "name": "UHDMovies",
-      "description": "UHD Movies streaming with multiple resolution",
-      "version": "1.2.0",
-      "author": "Nuvio Team",
-      "supportedTypes": [
-        "movie",
-        "tv"
-      ],
-      "filename": "providers/uhdmovies.js",
-      "enabled": true,
-      "formats": [
-        "mkv"
-      ],
-      "logo": "https://www.google.com/s2/favicons?domain=uhdmovies.ink&sz=128",
       "contentLanguage": [
         "en"
       ]
@@ -457,28 +439,6 @@
       "logo": "https://raw.githubusercontent.com/tapframe/nuvio-providers/main/Assets/Logo-2.png",
       "contentLanguage": [
         "en"
-      ]
-    },
-    {
-      "id": "hdhub4u",
-      "name": "HDHub4u",
-      "description": "Direct links from HDHub4u with high-speed download support",
-      "version": "1.1.0",
-      "author": "Nuvio Team",
-      "supportedTypes": [
-        "movie",
-        "tv"
-      ],
-      "filename": "providers/hdhub4u.js",
-      "enabled": true,
-      "formats": [
-        "mkv",
-        "mp4"
-      ],
-      "logo": "https://www.google.com/s2/favicons?domain=hdhub4u.me.uk&sz=128",
-      "contentLanguage": [
-        "en",
-        "hin"
       ]
     },
     {
