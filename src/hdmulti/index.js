@@ -1,14 +1,23 @@
-const uhdmovies = require('../../providers/uhdmovies.js');
-const fourkhdhub = require('../../providers/4khdhub.js');
-const hdhub4u = require('../../providers/hdhub4u.js');
-const moviesdrive = require('../../providers/moviesdrive.js');
+function loadProvider(label, factory) {
+  try {
+    const provider = factory();
+    if (!provider || typeof provider.getStreams !== 'function') {
+      console.log(`[HDMulti] ${label} is missing getStreams.`);
+      return null;
+    }
+    return provider;
+  } catch (error) {
+    console.log(`[HDMulti] ${label} unavailable: ${error && error.message ? error.message : error}`);
+    return null;
+  }
+}
 
 const SOURCES = [
-  { key: 'uhdmovies', label: 'UHDMovies', provider: uhdmovies },
-  { key: '4khdhub', label: '4KHDHub', provider: fourkhdhub },
-  { key: 'hdhub4u', label: 'HDHub4u', provider: hdhub4u },
-  { key: 'moviesdrive', label: 'Moviesdrive', provider: moviesdrive }
-];
+  { key: 'uhdmovies', label: 'UHDMovies', provider: loadProvider('UHDMovies', () => require('../../providers/uhdmovies.js')) },
+  { key: '4khdhub', label: '4KHDHub', provider: loadProvider('4KHDHub', () => require('../../providers/4khdhub.js')) },
+  { key: 'hdhub4u', label: 'HDHub4u', provider: loadProvider('HDHub4u', () => require('../../providers/hdhub4u.js')) },
+  { key: 'moviesdrive', label: 'Moviesdrive', provider: loadProvider('Moviesdrive', () => require('../../providers/moviesdrive.js')) }
+].filter((source) => Boolean(source.provider));
 
 function normalizeMediaType(mediaType) {
   if (mediaType === 'series') return 'tv';
@@ -41,6 +50,11 @@ async function runSource(source, tmdbId, mediaType, season, episode) {
 }
 
 async function getStreams(tmdbId, mediaType = 'movie', season = null, episode = null) {
+  if (SOURCES.length === 0) {
+    console.log('[HDMulti] No sub-providers are available in this runtime.');
+    return [];
+  }
+
   const normalizedType = normalizeMediaType(mediaType);
 
   const settled = await Promise.allSettled(

@@ -1,6 +1,6 @@
 /**
  * hdmulti - Built from src/hdmulti/
- * Generated: 2026-04-16T18:15:50.467Z
+ * Generated: 2026-04-16T18:45:40.431Z
  */
 var __defProp = Object.defineProperty;
 var __defProps = Object.defineProperties;
@@ -2929,16 +2929,25 @@ var require_moviesdrive = __commonJS({
 });
 
 // src/hdmulti/index.js
-var uhdmovies = require_uhdmovies();
-var fourkhdhub = require_khdhub();
-var hdhub4u = require_hdhub4u();
-var moviesdrive = require_moviesdrive();
+function loadProvider(label, factory) {
+  try {
+    const provider = factory();
+    if (!provider || typeof provider.getStreams !== "function") {
+      console.log(`[HDMulti] ${label} is missing getStreams.`);
+      return null;
+    }
+    return provider;
+  } catch (error) {
+    console.log(`[HDMulti] ${label} unavailable: ${error && error.message ? error.message : error}`);
+    return null;
+  }
+}
 var SOURCES = [
-  { key: "uhdmovies", label: "UHDMovies", provider: uhdmovies },
-  { key: "4khdhub", label: "4KHDHub", provider: fourkhdhub },
-  { key: "hdhub4u", label: "HDHub4u", provider: hdhub4u },
-  { key: "moviesdrive", label: "Moviesdrive", provider: moviesdrive }
-];
+  { key: "uhdmovies", label: "UHDMovies", provider: loadProvider("UHDMovies", () => require_uhdmovies()) },
+  { key: "4khdhub", label: "4KHDHub", provider: loadProvider("4KHDHub", () => require_khdhub()) },
+  { key: "hdhub4u", label: "HDHub4u", provider: loadProvider("HDHub4u", () => require_hdhub4u()) },
+  { key: "moviesdrive", label: "Moviesdrive", provider: loadProvider("Moviesdrive", () => require_moviesdrive()) }
+].filter((source) => Boolean(source.provider));
 function normalizeMediaType(mediaType) {
   if (mediaType === "series")
     return "tv";
@@ -2971,6 +2980,10 @@ function runSource(source, tmdbId, mediaType, season, episode) {
 }
 function getStreams(tmdbId, mediaType = "movie", season = null, episode = null) {
   return __async(this, null, function* () {
+    if (SOURCES.length === 0) {
+      console.log("[HDMulti] No sub-providers are available in this runtime.");
+      return [];
+    }
     const normalizedType = normalizeMediaType(mediaType);
     const settled = yield Promise.allSettled(
       SOURCES.map((source) => runSource(source, tmdbId, normalizedType, season, episode))
