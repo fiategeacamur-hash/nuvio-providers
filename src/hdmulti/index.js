@@ -13,11 +13,11 @@ function loadProvider(label, factory) {
 }
 
 const SOURCES = [
-  { key: 'uhdmovies', label: 'UHDMovies', provider: loadProvider('UHDMovies', () => require('../../providers/uhdmovies.js')) },
-  { key: '4khdhub', label: '4KHDHub', provider: loadProvider('4KHDHub', () => require('../../providers/4khdhub.js')) },
-  { key: 'hdhub4u', label: 'HDHub4u', provider: loadProvider('HDHub4u', () => require('../../providers/hdhub4u.js')) },
-  { key: 'moviesdrive', label: 'Moviesdrive', provider: loadProvider('Moviesdrive', () => require('../../providers/moviesdrive.js')) }
-].filter((source) => Boolean(source.provider));
+  { key: 'uhdmovies', label: 'UHDMovies', factory: () => require('../../providers/uhdmovies.js') },
+  { key: '4khdhub', label: '4KHDHub', factory: () => require('../../providers/4khdhub.js') },
+  { key: 'hdhub4u', label: 'HDHub4u', factory: () => require('../../providers/hdhub4u.js') },
+  { key: 'moviesdrive', label: 'Moviesdrive', factory: () => require('../../providers/moviesdrive.js') }
+];
 const SOURCE_TIMEOUT_BY_KEY = {
   uhdmovies: 20_000,
   moviesdrive: 20_000,
@@ -25,9 +25,20 @@ const SOURCE_TIMEOUT_BY_KEY = {
   '4khdhub': 12_000
 };
 const TV_SOURCE_ALLOWLIST = ['4khdhub', 'uhdmovies'];
+const PROVIDER_CACHE = Object.create(null);
 
 function getSourceTimeout(source) {
   return SOURCE_TIMEOUT_BY_KEY[source.key] || 15_000;
+}
+
+function getProvider(source) {
+  if (Object.prototype.hasOwnProperty.call(PROVIDER_CACHE, source.key)) {
+    return PROVIDER_CACHE[source.key];
+  }
+
+  const provider = loadProvider(source.label, source.factory);
+  PROVIDER_CACHE[source.key] = provider || null;
+  return PROVIDER_CACHE[source.key];
 }
 
 function isTvRuntime() {
@@ -66,9 +77,12 @@ function withSiteLabel(stream, source) {
 async function runSource(source, tmdbId, mediaType, season, episode) {
   let timeoutId;
   const timeoutMs = getSourceTimeout(source);
+  const provider = getProvider(source);
+  if (!provider) return [];
+
   try {
     const result = await Promise.race([
-      source.provider.getStreams(tmdbId, mediaType, season, episode),
+      provider.getStreams(tmdbId, mediaType, season, episode),
       new Promise((resolve) => {
         timeoutId = setTimeout(() => {
           console.log(`[HDMulti] ${source.label} timed out after ${timeoutMs}ms.`);
