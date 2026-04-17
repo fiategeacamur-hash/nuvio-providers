@@ -1,6 +1,6 @@
 /**
  * hdmulti - Built from src/hdmulti/
- * Generated: 2026-04-16T19:40:01.946Z
+ * Generated: 2026-04-17T10:27:33.213Z
  */
 var __defProp = Object.defineProperty;
 var __defProps = Object.defineProperties;
@@ -2954,9 +2954,13 @@ var SOURCE_TIMEOUT_BY_KEY = {
   hdhub4u: 12e3,
   "4khdhub": 12e3
 };
-var TV_SOURCE_ALLOWLIST = ["4khdhub", "uhdmovies"];
+var TV_SOURCE_ALLOWLIST = ["4khdhub"];
 var PROVIDER_CACHE = /* @__PURE__ */ Object.create(null);
+var TOTAL_TIMEOUT_MS = 18e3;
+var TV_TOTAL_TIMEOUT_MS = 8e3;
 function getSourceTimeout(source) {
+  if (isTvRuntime())
+    return 7e3;
   return SOURCE_TIMEOUT_BY_KEY[source.key] || 15e3;
 }
 function getProvider(source) {
@@ -3028,6 +3032,7 @@ function runSource(source, tmdbId, mediaType, season, episode) {
 }
 function getStreams(tmdbId, mediaType = "movie", season = null, episode = null) {
   return __async(this, null, function* () {
+    const isTv = isTvRuntime();
     const activeSources = getActiveSources();
     if (activeSources.length === 0) {
       console.log("[HDMulti] No sub-providers are available in this runtime.");
@@ -3035,22 +3040,23 @@ function getStreams(tmdbId, mediaType = "movie", season = null, episode = null) 
     }
     const normalizedType = normalizeMediaType(mediaType);
     const streams = [];
-    const runSequentially = isTvRuntime();
-    if (runSequentially) {
-      for (const source of activeSources) {
-        const result = yield runSource(source, tmdbId, normalizedType, season, episode);
-        if (Array.isArray(result))
-          streams.push(...result);
-      }
-      return streams;
-    }
-    const results = yield Promise.all(
-      activeSources.map((source) => runSource(source, tmdbId, normalizedType, season, episode))
+    const collectorPromise = Promise.all(
+      activeSources.map((source) => __async(this, null, function* () {
+        const sourceStreams = yield runSource(source, tmdbId, normalizedType, season, episode);
+        if (Array.isArray(sourceStreams))
+          streams.push(...sourceStreams);
+      }))
     );
-    for (const sourceStreams of results) {
-      if (Array.isArray(sourceStreams))
-        streams.push(...sourceStreams);
-    }
+    const totalTimeout = isTv ? TV_TOTAL_TIMEOUT_MS : TOTAL_TIMEOUT_MS;
+    yield Promise.race([
+      collectorPromise,
+      new Promise((resolve) => {
+        setTimeout(() => {
+          console.log(`[HDMulti] Global timeout reached (${totalTimeout}ms). Returning partial results.`);
+          resolve();
+        }, totalTimeout);
+      })
+    ]);
     return streams;
   });
 }
