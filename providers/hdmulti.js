@@ -1,6 +1,6 @@
 /**
  * hdmulti - Built from src/hdmulti/
- * Generated: 2026-04-17T10:27:33.213Z
+ * Generated: 2026-04-17T10:31:18.195Z
  */
 var __defProp = Object.defineProperty;
 var __defProps = Object.defineProperties;
@@ -2954,13 +2954,12 @@ var SOURCE_TIMEOUT_BY_KEY = {
   hdhub4u: 12e3,
   "4khdhub": 12e3
 };
-var TV_SOURCE_ALLOWLIST = ["4khdhub"];
 var PROVIDER_CACHE = /* @__PURE__ */ Object.create(null);
 var TOTAL_TIMEOUT_MS = 18e3;
-var TV_TOTAL_TIMEOUT_MS = 8e3;
+var TV_TOTAL_TIMEOUT_MS = 14e3;
 function getSourceTimeout(source) {
   if (isTvRuntime())
-    return 7e3;
+    return 1e4;
   return SOURCE_TIMEOUT_BY_KEY[source.key] || 15e3;
 }
 function getProvider(source) {
@@ -2980,9 +2979,7 @@ function isTvRuntime() {
   }
 }
 function getActiveSources() {
-  if (!isTvRuntime())
-    return SOURCES;
-  return SOURCES.filter((source) => TV_SOURCE_ALLOWLIST.includes(source.key));
+  return SOURCES;
 }
 function normalizeMediaType(mediaType) {
   if (mediaType === "series")

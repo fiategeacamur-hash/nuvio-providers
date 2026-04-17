@@ -24,13 +24,12 @@ const SOURCE_TIMEOUT_BY_KEY = {
   hdhub4u: 12_000,
   '4khdhub': 12_000
 };
-const TV_SOURCE_ALLOWLIST = ['4khdhub'];
 const PROVIDER_CACHE = Object.create(null);
 const TOTAL_TIMEOUT_MS = 18_000;
-const TV_TOTAL_TIMEOUT_MS = 8_000;
+const TV_TOTAL_TIMEOUT_MS = 14_000;
 
 function getSourceTimeout(source) {
-  if (isTvRuntime()) return 7_000;
+  if (isTvRuntime()) return 10_000;
   return SOURCE_TIMEOUT_BY_KEY[source.key] || 15_000;
 }
 
@@ -54,8 +53,7 @@ function isTvRuntime() {
 }
 
 function getActiveSources() {
-  if (!isTvRuntime()) return SOURCES;
-  return SOURCES.filter((source) => TV_SOURCE_ALLOWLIST.includes(source.key));
+  return SOURCES;
 }
 
 function normalizeMediaType(mediaType) {
