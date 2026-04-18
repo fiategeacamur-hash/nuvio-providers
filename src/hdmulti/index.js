@@ -18,26 +18,27 @@ const SOURCES = [
   { key: 'hdhub4u', label: 'HDHub4u', factory: () => require('../../providers/hdhub4u.js') },
   { key: 'moviesdrive', label: 'Moviesdrive', factory: () => require('../../providers/moviesdrive.js') }
 ];
+
 const SOURCE_TIMEOUT_BY_KEY = {
-  uhdmovies: 20_000,
-  moviesdrive: 20_000,
-  hdhub4u: 12_000,
-  '4khdhub': 12_000
+  uhdmovies: 10_000,   // 20s → 10s
+  moviesdrive: 10_000, // 20s → 10s
+  hdhub4u: 8_000,      // 12s → 8s
+  '4khdhub': 8_000     // 12s → 8s
 };
+
 const PROVIDER_CACHE = Object.create(null);
-const TOTAL_TIMEOUT_MS = 18_000;
-const TV_TOTAL_TIMEOUT_MS = 14_000;
+const TOTAL_TIMEOUT_MS = 10_000;      // 18s → 10s (REDUCED)
+const TV_TOTAL_TIMEOUT_MS = 8_000;    // 14s → 8s (REDUCED)
 
 function getSourceTimeout(source) {
-  if (isTvRuntime()) return 10_000;
-  return SOURCE_TIMEOUT_BY_KEY[source.key] || 15_000;
+  if (isTvRuntime()) return 8_000;
+  return SOURCE_TIMEOUT_BY_KEY[source.key] || 8_000;
 }
 
 function getProvider(source) {
   if (Object.prototype.hasOwnProperty.call(PROVIDER_CACHE, source.key)) {
     return PROVIDER_CACHE[source.key];
   }
-
   const provider = loadProvider(source.label, source.factory);
   PROVIDER_CACHE[source.key] = provider || null;
   return PROVIDER_CACHE[source.key];
@@ -45,10 +46,29 @@ function getProvider(source) {
 
 function isTvRuntime() {
   try {
-    const ua = String(globalThis && globalThis.navigator && globalThis.navigator.userAgent ? globalThis.navigator.userAgent : '').toLowerCase();
-    return /smart-tv|smarttv|tizen|web0s|webos|bravia|aft|android tv|googletv/.test(ua);
-  } catch (_) {
-    return false;
+    let ua = '';
+    
+    // CRITICAL FIX: Multiple fallbacks for different TV environments
+    if (typeof globalThis !== 'undefined' && globalThis.navigator && globalThis.navigator.userAgent) {
+      ua = globalThis.navigator.userAgent;
+    } else if (typeof window !== 'undefined' && window.navigator && window.navigator.userAgent) {
+      ua = window.navigator.userAgent;
+    } else if (typeof navigator !== 'undefined' && navigator.userAgent) {
+      ua = navigator.userAgent;
+    }
+    
+    ua = String(ua).toLowerCase();
+    console.log(`[HDMulti] UA: ${ua.substring(0, 60)}...`);
+    
+    // Expanded TV detection patterns
+    const isTv = /smart-tv|smarttv|tizen|web0s|webos|bravia|aft|android tv|googletv|hbbtv|viera|aquos|regza/.test(ua);
+    console.log(`[HDMulti] TV device: ${isTv}`);
+    return isTv;
+  } catch (error) {
+    // CRITICAL FIX: If detection fails, DEFAULT TO TV MODE
+    // Error means likely native TV environment without proper navigator object
+    console.log(`[HDMulti] TV detect failed: ${error.message} → using TV mode`);
+    return true;  // ← RETURN TRUE NOT FALSE!
   }
 }
 
@@ -86,15 +106,16 @@ async function runSource(source, tmdbId, mediaType, season, episode) {
       provider.getStreams(tmdbId, mediaType, season, episode),
       new Promise((resolve) => {
         timeoutId = setTimeout(() => {
-          console.log(`[HDMulti] ${source.label} timed out after ${timeoutMs}ms.`);
+          console.log(`[HDMulti] ${source.label} timeout (${timeoutMs}ms)`);
           resolve([]);
         }, timeoutMs);
       })
     ]);
     if (!Array.isArray(result)) return [];
+    console.log(`[HDMulti] ${source.label}: ${result.length} streams`);
     return result.map((stream) => withSiteLabel(stream, source));
   } catch (error) {
-    console.log(`[HDMulti] ${source.label} failed: ${error && error.message ? error.message : error}`);
+    console.log(`[HDMulti] ${source.label} error: ${error.message}`);
     return [];
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
@@ -106,30 +127,59 @@ async function getStreams(tmdbId, mediaType = 'movie', season = null, episode = 
   const activeSources = getActiveSources();
 
   if (activeSources.length === 0) {
-    console.log('[HDMulti] No sub-providers are available in this runtime.');
+    console.log('[HDMulti] No sources available.');
     return [];
   }
 
   const normalizedType = normalizeMediaType(mediaType);
   const streams = [];
-  const collectorPromise = Promise.all(
-    activeSources.map(async (source) => {
+  let isCollecting = true;
+
+  console.log(`[HDMulti] Searching ${tmdbId} (${normalizedType}), TV=${isTv}`);
+
+  // CRITICAL FIX: Start all requests immediately
+  const sourcePromises = activeSources.map(async (source) => {
+    if (!isCollecting) return;  // Don't start if already stopped
+    
+    try {
       const sourceStreams = await runSource(source, tmdbId, normalizedType, season, episode);
-      if (Array.isArray(sourceStreams)) streams.push(...sourceStreams);
-    })
-  );
+      if (Array.isArray(sourceStreams) && isCollecting) {
+        streams.push(...sourceStreams);
+        console.log(`[HDMulti] ${source.label}: +${sourceStreams.length} (total: ${streams.length})`);
+      }
+    } catch (error) {
+      console.log(`[HDMulti] ${source.label} exception: ${error.message}`);
+    }
+  });
 
   const totalTimeout = isTv ? TV_TOTAL_TIMEOUT_MS : TOTAL_TIMEOUT_MS;
+
+  // CRITICAL FIX: Return EARLY if we get any results
+  // Don't wait for all sources if one is fast enough
   await Promise.race([
-    collectorPromise,
+    Promise.all(sourcePromises),  // Wait for all OR
     new Promise((resolve) => {
+      // Check every 500ms for early results
+      const checkInterval = setInterval(() => {
+        if (streams.length > 0) {
+          console.log(`[HDMulti] Got ${streams.length} streams, returning early`);
+          clearInterval(checkInterval);
+          isCollecting = false;  // Stop accepting new results
+          resolve();
+        }
+      }, 500);  // ← CHECK EVERY 500MS!
+
+      // Absolute timeout fallback
       setTimeout(() => {
-        console.log(`[HDMulti] Global timeout reached (${totalTimeout}ms). Returning partial results.`);
+        clearInterval(checkInterval);
+        isCollecting = false;
+        console.log(`[HDMulti] Timeout (${totalTimeout}ms), returning ${streams.length} streams`);
         resolve();
       }, totalTimeout);
     })
   ]);
 
+  console.log(`[HDMulti] Result: ${streams.length} streams`);
   return streams;
 }
 
