@@ -13,10 +13,9 @@ function loadProvider(label, factory) {
 }
 
 const SOURCES = [
-  { key: 'uhdmovies', label: 'UHDMovies', factory: () => require('../../providers/uhdmovies.js') },
-  { key: '4khdhub', label: '4KHDHub', factory: () => require('../../providers/4khdhub.js') },
-  { key: 'hdhub4u', label: 'HDHub4u', factory: () => require('../../providers/hdhub4u.js') },
-  { key: 'moviesdrive', label: 'Moviesdrive', factory: () => require('../../providers/moviesdrive.js') }
+  
+  { key: '4khdhub', label: '4KHDHub', factory: () => require('../../providers/4khdhub.js') }
+
 ];
 
 const SOURCE_TIMEOUT_BY_KEY = {
