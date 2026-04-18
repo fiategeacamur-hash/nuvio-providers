@@ -20,21 +20,151 @@ const SOURCES = [
 ];
 
 const SOURCE_TIMEOUT_BY_KEY = {
-  uhdmovies: 10_000,   // 20s → 10s
-  moviesdrive: 10_000, // 20s → 10s
-  hdhub4u: 8_000,      // 12s → 8s
-  '4khdhub': 8_000     // 12s → 8s
+  uhdmovies: 10_000,
+  moviesdrive: 10_000,
+  hdhub4u: 8_000,
+  '4khdhub': 8_000
 };
 
 const PROVIDER_CACHE = Object.create(null);
-const TOTAL_TIMEOUT_MS = 10_000;      // 18s → 10s (REDUCED)
-const TV_TOTAL_TIMEOUT_MS = 8_000;    // 14s → 8s (REDUCED)
+const TOTAL_TIMEOUT_MS = 12_000;
+const TV_TOTAL_TIMEOUT_MS = 10_000;
 
 function getSourceTimeout(source) {
   if (isTvRuntime()) return 8_000;
   return SOURCE_TIMEOUT_BY_KEY[source.key] || 8_000;
 }
 
+function getProvider(source) {
+  if (Object.prototype.hasOwnProperty.call(PROVIDER_CACHE, source.key)) {
+    return PROVIDER_CACHE[source.key];
+  }
+
+  const provider = loadProvider(source.label, source.factory);
+  PROVIDER_CACHE[source.key] = provider || null;
+  return PROVIDER_CACHE[source.key];
+}
+
+function isTvRuntime() {
+  try {
+    let ua = '';
+    if (typeof globalThis !== 'undefined' && globalThis.navigator && globalThis.navigator.userAgent) {
+      ua = globalThis.navigator.userAgent;
+    } else if (typeof window !== 'undefined' && window.navigator && window.navigator.userAgent) {
+      ua = window.navigator.userAgent;
+    } else if (typeof navigator !== 'undefined' && navigator.userAgent) {
+      ua = navigator.userAgent;
+    }
+    ua = String(ua).toLowerCase();
+    return /smart-tv|smarttv|tizen|web0s|webos|bravia|aft|android tv|googletv|hbbtv/.test(ua);
+  } catch (_) {
+    return true;
+  }
+}
+
+function getActiveSources() {
+  return SOURCES;
+}
+
+function normalizeMediaType(mediaType) {
+  if (mediaType === 'series') return 'tv';
+  if (mediaType === 'show') return 'tv';
+  return mediaType || 'movie';
+}
+
+function withSiteLabel(stream, source) {
+  const cloned = Object.assign({}, stream);
+  const safeName = (cloned.name || '').trim();
+  const safeTitle = (cloned.title || '').trim();
+
+  cloned.name = safeName.includes(source.label) ? safeName : `[${source.label}] ${safeName || 'Link'}`;
+  cloned.title = safeTitle.includes(`[${source.label}]`) ? safeTitle : `[${source.label}] ${safeTitle || 'Direct Link'}`;
+  cloned.provider = 'hdmulti';
+  cloned.sourceSite = source.key;
+
+  return cloned;
+}
+
+async function runSource(source, tmdbId, mediaType, season, episode) {
+  let timeoutId;
+  const timeoutMs = getSourceTimeout(source);
+  const provider = getProvider(source);
+  if (!provider) return [];
+
+  try {
+    const result = await Promise.race([
+      provider.getStreams(tmdbId, mediaType, season, episode),
+      new Promise((resolve) => {
+        timeoutId = setTimeout(() => {
+          console.log(`[HDMulti] ${source.label} timed out after ${timeoutMs}ms.`);
+          resolve([]);
+        }, timeoutMs);
+      })
+    ]);
+    if (!Array.isArray(result)) return [];
+    return result.map((stream) => withSiteLabel(stream, source));
+  } catch (error) {
+    console.log(`[HDMulti] ${source.label} failed: ${error && error.message ? error.message : error}`);
+    return [];
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function getStreams(tmdbId, mediaType = 'movie', season = null, episode = null) {
+  const isTv = isTvRuntime();
+  const activeSources = getActiveSources();
+
+  if (activeSources.length === 0) {
+    console.log('[HDMulti] No sub-providers are available in this runtime.');
+    return [];
+  }
+
+  const normalizedType = normalizeMediaType(mediaType);
+  const streams = [];
+  
+  console.log(`[HDMulti] Starting search for TMDB ${tmdbId} (${normalizedType})`);
+
+  // CRITICAL FIX: Use Promise.allSettled instead of Promise.all
+  // This ensures ALL sources complete, even if some fail
+  // No timeout cancels the entire operation
+  const sourcePromises = activeSources.map(async (source) => {
+    try {
+      const sourceStreams = await runSource(source, tmdbId, normalizedType, season, episode);
+      if (Array.isArray(sourceStreams) && sourceStreams.length > 0) {
+        console.log(`[HDMulti] ${source.label} found ${sourceStreams.length} streams`);
+        streams.push(...sourceStreams);
+      }
+    } catch (error) {
+      console.log(`[HDMulti] ${source.label} exception: ${error.message}`);
+    }
+  });
+
+  const totalTimeout = isTv ? TV_TOTAL_TIMEOUT_MS : TOTAL_TIMEOUT_MS;
+
+  // CRITICAL: Wait for ALL sources with timeout
+  // This is NOT Promise.race - it's Promise with timeout wrapper
+  // The difference: we ALWAYS return streams, not cancel on timeout
+  try {
+    await Promise.race([
+      Promise.allSettled(sourcePromises),  // ← ALL sources must complete or settle
+      new Promise((resolve, reject) => {
+        setTimeout(() => {
+          // Log that timeout occurred, but don't cancel collection
+          console.log(`[HDMulti] Global timeout (${totalTimeout}ms) - returning ${streams.length} streams so far`);
+          resolve();  // Resolve (don't reject) so we return streams
+        }, totalTimeout);
+      })
+    ]);
+  } catch (error) {
+    console.log(`[HDMulti] Collection error: ${error.message}`);
+  }
+
+  console.log(`[HDMulti] Final result: ${streams.length} streams from ${activeSources.length} sources`);
+  return streams;
+}
+
+module.exports = { getStreams };
 function getProvider(source) {
   if (Object.prototype.hasOwnProperty.call(PROVIDER_CACHE, source.key)) {
     return PROVIDER_CACHE[source.key];
